@@ -1,52 +1,66 @@
-# @author Sten
-# 作者仓库:https://github.com/aefa6/QinglongScript.git
-# 觉得不错麻烦点个star谢谢
-
 import json
+import os
 
-import notify
 import requests
 
-# 填写下面的信息，经纬度请自行百度，使用青龙自带的推送
-# key = "qAbLkhTG46uP3J8A"
-lon = "121.3912"
-lat = "31.2513"
+# 通过青龙环境变量配置，或直接修改下方默认值
+KEY = os.environ.get("CAIYUN_KEY", "qAbLkhTG46uP3J8C")
+LON = os.environ.get("CAIYUN_LON", "121.3912")
+LAT = os.environ.get("CAIYUN_LAT", "31.2513")
 
-# 下面的不用管了
-api_url = f"https://api.caiyunapp.com/v2.6/{key}/{lon},{lat}/weather?alert=true&realtime&minutely"
-response = requests.get(api_url)
-print("状态码:", response.status_code)
-print("响应内容:", repr(response.text))
-data = json.loads(response.text)
+# 综合接口：包含实况、 hourly、 daily、 alert
+api_url = (
+    f"https://api.caiyunapp.com/v2.6/{KEY}/{LON},{LAT}/weather"
+    "?dailysteps=3&hourlysteps=48&alert=true"
+)
+
+resp = requests.get(api_url, timeout=15)
+resp.raise_for_status()
+data = resp.json()
+
+if data.get("status") != "ok":
+    print("API 返回异常:", json.dumps(data, ensure_ascii=False, indent=2))
+    raise SystemExit(1)
+
 weather = data["result"]
+realtime = weather["realtime"]
 
-# 1. 安全获取 alert 对象，如果没有则返回空字典 {}
-alert_data = weather.get("alert", {})
-# 2. 安全获取 content 列表，如果没有则返回空列表 []
-content_list = alert_data.get("content", [])
-if content_list:
-    tip = content_list[0]["description"]
-else:
-    tip = ""
+# 预警
+alert_content = weather.get("alert", {}).get("content", [])
+tip = alert_content[0]["description"] if alert_content else ""
+
+# 全天预报（取第1天）
+daily = weather["daily"]
+day0 = daily["temperature"][0]
+day0_08h_20h = daily["temperature_08h_20h"][0]
+day0_20h_32h = daily["temperature_20h_32h"][0]
 
 info = f"""
-实时天气:  
-天气现象:{weather["realtime"]["skycon"]}    
-温度:{weather["realtime"]["temperature"]}°C     
-体感温度:{weather["realtime"]["apparent_temperature"]}°C    
-湿度:{weather["realtime"]["humidity"]}      
-能见度:{weather["realtime"]["visibility"]}KM    
-紫外线强度:{weather["realtime"]["life_index"]["ultraviolet"]["desc"]}   
-空气质量:{weather["realtime"]["air_quality"]["description"]["chn"]}     
-总体感觉:{weather["realtime"]["life_index"]["comfort"]["desc"]}     
-    
+实时天气:
+天气现象:{realtime['skycon']}
+温度:{realtime['temperature']}°C
+体感温度:{realtime['apparent_temperature']}°C
+湿度:{realtime['humidity']}
+能见度:{realtime['visibility']}KM
+紫外线强度:{realtime['life_index']['ultraviolet']['desc']}
+空气质量:{realtime['air_quality']['description']['chn']}
+总体感觉:{realtime['life_index']['comfort']['desc']}
+
 全天:
-温度:{weather["daily"]["temperature"][0]["min"]} - {weather["daily"]["temperature"][0]["max"]}°C, 白天温度:{weather["daily"]["temperature_08h_20h"][0]["min"]} - {weather["daily"]["temperature_08h_20h"][0]["max"]}°C, 夜间温度:{weather["daily"]["temperature_20h_32h"][0]["min"]} - {weather["daily"]["temperature_20h_32h"][0]["max"]}°C    
-紫外线强度{weather["daily"]["life_index"]["ultraviolet"][0]["desc"]},总体感觉{weather["daily"]["life_index"]["comfort"][0]["desc"]}      
-    
-预测:{weather["minutely"]["description"]},{weather["hourly"]["description"]}    
+温度:{day0['min']} - {day0['max']}°C
+白天温度:{day0_08h_20h['min']} - {day0_08h_20h['max']}°C
+夜间温度:{day0_20h_32h['min']} - {day0_20h_32h['max']}°C
+紫外线强度:{daily['life_index']['ultraviolet'][0]['desc']}
+总体感觉:{daily['life_index']['comfort'][0]['desc']}
+
+预测:{weather['hourly']['description']}
 {tip}
 """
 
 print(info)
-notify.send("彩云天气", info)
+
+try:
+    from notify import send as send_notify
+    send_notify("彩云天气", info)
+except ImportError:
+    print("未找到 notify 模块，跳过推送")
