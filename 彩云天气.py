@@ -4,9 +4,9 @@ import os
 import requests
 
 # 通过青龙环境变量配置，或直接修改下方默认值
-KEY = os.environ.get("CAIYUN_KEY", "qAbLkhTG46uP3J8C")
-LON = os.environ.get("CAIYUN_LON", "121.3912")
-LAT = os.environ.get("CAIYUN_LAT", "31.2513")
+KEY = os.environ.get("CAIYUN_KEY", "")
+LON = os.environ.get("CAIYUN_LON", "")
+LAT = os.environ.get("CAIYUN_LAT", "")
 
 # 综合接口：包含实况、 hourly、 daily、 alert
 api_url = (
